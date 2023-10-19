@@ -1,1 +1,1 @@
-# ScrapeGPT
+# CYOAGPT
