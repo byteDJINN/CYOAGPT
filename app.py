@@ -1,11 +1,32 @@
 import openai
-import time
+import time, random
 import streamlit as st
 
 # Example dummy function hard coded to return the same weather
 # In production, this could be your backend API or an external API
 
 delay = 0.5
+
+def gpt(system, user):
+  time.sleep(delay)
+  response = openai.ChatCompletion.create(
+      model="gpt-3.5-turbo",
+      messages=[
+          {
+            "role": "user",
+            "content": user
+          },
+          {
+              "role": "system",
+              "content": system
+          }
+      ],
+      temperature=1,
+      max_tokens=200,  # Adjust this limit as needed
+      stop=[],
+  )
+  response_text = response.choices[0]["message"]["content"]
+  return response_text
 
 
 def gptNext(content):
@@ -46,7 +67,7 @@ def gptConsider():
     messages=[
       {
         "role": "user", 
-        "content": "Give a list (50 words max) of possible actions the character can take. Start your response with \"You could...\" \n"+"SETTING: " + world_setting + "\n" + "\n".join(
+        "content": "Give a list (50 words max) of possible actions the character can take. Start your response with \"You could...\" \n"+"SETTING: " + worldSetting + "\n" + "\n".join(
             [pastStory[x]+"\n"+"ACTION: "+pastAction[x] for x in range(max(-5, -len(pastStory)), 0)])
       },
       {
@@ -74,7 +95,7 @@ def isActionValid():
     messages=[
       {
         "role": "user",
-        "content": "SETTING: " + world_setting + "\n" + "STORY: " + "\n".join([pastStory[x] + "\n" + pastAction[x] for x in range(max(-5, -len(pastStory)), -1)]) + "\n" + pastStory[-1] + "\n" + "ACTION: " + pastAction[-1] + "\n" + "INVENTORY: " + inventory
+        "content": "SETTING: " + worldSetting + "\n" + "STORY: " + "\n".join([pastStory[x] + "\n" + pastAction[x] for x in range(max(-5, -len(pastStory)), -1)]) + "\n" + pastStory[-1] + "\n" + "ACTION: " + pastAction[-1] + "\n" + "INVENTORY: " + inventory
       },
       {
         "role": "system",
@@ -153,32 +174,33 @@ def getHealth():
 try:
   openai.api_key = st.session_state.openaiKey
 except:
-  openai.api_key = None
+  openai.api_key = ""
 try:
   settingPrompt = st.session_state.settingPrompt
 except:
-  settingPrompt = None
+  settingPrompt = ""
 
-openai.api_key = st.text_input("OpenAI API Key", type="password", disabled=openai.api_key != None)
+openai.api_key = st.text_input(
+    "OpenAI API Key", type="password", disabled=openai.api_key != "")
+if openai.api_key == "":
+  st.error("Please enter your OpenAI API Key")
+  st.stop()
+
 if "openaiKey" not in st.session_state:
-  if openai.api_key:
-    st.session_state.openaiKey = openai.api_key
-    st.rerun()
-  else:
-    st.error("Please enter your OpenAI API Key")
-    st.stop()
+  st.session_state.openaiKey = openai.api_key
+  st.rerun()
 
-settingPrompt = st.text_input("World Prompt", disabled=settingPrompt != None)
+settingPrompt = st.text_input(
+    "World Prompt", disabled=settingPrompt != "")
+if settingPrompt == "":
+  st.error("Please enter a world prompt")
+  st.stop()
 if "settingPrompt" not in st.session_state:
-  if settingPrompt:
-    st.session_state.settingPrompt = settingPrompt
-    st.rerun()
-  else:
-    st.error("Please enter a world prompt")
-    st.stop()
+  st.session_state.settingPrompt = settingPrompt
+  st.rerun()
 
-
-
+if "worldSetting" not in st.session_state and not st.button("Start"):
+  st.stop()
 
 def chatAI(text):
   with st.chat_message("assistant"):
@@ -187,46 +209,46 @@ def chatU(text):
   with st.chat_message("user"):
     st.write(text)
 
-if "world_setting" not in st.session_state:
-  world_setting = gptNext(settingPrompt +
+if "worldSetting" not in st.session_state:
+  worldSetting = gptNext(st.session_state.settingPrompt +
       "\nWrite a setting for this story (do not use 2nd person POV). Use approximately 100 words. Use third person point of view. \n")
-  goal = gptNext("""
-  Write the main character's goal, for example:
-  - Bring life to the wasteland, making it as green as it once was.
-  - Become the richest person in the corporate world.
-  - Start a crime syndicate and take over the city.
-  - Assassinate the president.
-  - Start a revolution and overthrow the government.
-  - Create the largest farm in the world.
-  It can be an evil dream if it fits the setting. 
+  chatAI(worldSetting)
+  goal = gpt("",f"""
+  This is a book series. Write the final goal for the end of the series. 
+  You must use infinitive form. 
+  The goal must be {random.choice(["good", "evil"])}.
   Do not respond with any prose, only respond with one sentence describing the goal.
-  Use second person point of view. Use a maximum of 20 words.\nSETTING: """ + world_setting)
-  print(goal)
+  Skip the "Your goal is" part. 
+  The goal must be specific, narrow, and measurable. 
+  Respond with second person point of view. Use a maximum of 20 words. 
+  \nSETTING: """ + worldSetting)
   pastStory = [gptNext(
-      "Given the story setting, respond with the main character waking up. Use second person point of view. Use a maximum of 50 words.\n" + "SETTING: " + world_setting)]
+      "Given the story setting, respond with the main character waking up. Use second person point of view. Use a maximum of 50 words.\n" + "SETTING: " + worldSetting)]
   pastAction = [""]
   inventory = "[]"
   health = 10
-  st.session_state.world_setting = world_setting
+  st.session_state.worldSetting = worldSetting
   st.session_state.goal = goal
   st.session_state.pastStory = pastStory
   st.session_state.pastAction = pastAction
   st.session_state.inventory = inventory
   st.session_state.health = health
-world_setting = st.session_state.world_setting
-goal = st.session_state.goal
-pastStory = st.session_state.pastStory
-pastAction = st.session_state.pastAction
-inventory = st.session_state.inventory
-health = st.session_state.health
+else:
+  worldSetting = st.session_state.worldSetting
+  goal = st.session_state.goal
+  pastStory = st.session_state.pastStory
+  pastAction = st.session_state.pastAction
+  inventory = st.session_state.inventory
+  health = st.session_state.health
+  chatAI(worldSetting)
+  chatAI(goal)
 
-chatAI(world_setting)
-chatAI(goal)
+
+
 for x in range(len(pastStory)):
   chatAI(pastStory[x])
   if (len(pastAction) > x+1):
     chatU(pastAction[x+1])
-
 
 choice = st.chat_input("What do you do? ")
 
@@ -237,7 +259,7 @@ if choice:
   pastAction.append(choice)
   
   if isActionValid():
-    response = gptNext("Your response should use a maximum of 50 words.\n"+"SETTING: " + world_setting + "\n" + "\n".join(
+    response = gptNext("Your response should use a maximum of 50 words.\n"+"SETTING: " + worldSetting + "\n" + "\n".join(
         [pastStory[x]+"\n"+"ACTION: "+pastAction[x] for x in range(max(-5, -len(pastStory)), 0)]))
     chatAI(response)
     pastStory.append(response)
