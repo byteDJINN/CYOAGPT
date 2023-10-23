@@ -187,7 +187,7 @@ def chatU(text):
   with st.chat_message("user"):
     st.write(text)
 
-if "setting" not in st.session_state:
+if "world_setting" not in st.session_state:
   world_setting = gptNext(settingPrompt +
       "\nWrite a setting for this story (do not use 2nd person POV). Use approximately 100 words. Use third person point of view. \n")
   goal = gptNext("""
