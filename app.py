@@ -123,15 +123,15 @@ def getInventory():
     messages=[
       {
         "role": "user",
-        "content": """Given the player's current inventory, action, and result, respond with their new inventory.  
-        """ + "\n" + "INVENTORY: " + inventory + "\n" + "ACTION: " + pastAction[-1] + "\n" + "RESULT: " + pastStory[-1]
+        "content": """Given the past, and the character's current possessions, respond with their new possessions.
+        """ + "\n" + "STORY: " + "\n".join(
+            ["ACTION: "+pastAction[x] + "\n"+ pastStory[x] for x in range(max(-5, -len(pastStory)), 0)]) + "\n" + "INVENTORY: " + inventory
       },
       {
         "role": "system",
         "content":"""
-        You always respond with a list of items. You do not respond with any prose. 
-        Your response should always follow the format: [item1, item2, ...]
-        You do not respond with the word 'INVENTORY'. You only respond with a single list of items."""
+        You always respond with a list of items. 
+        You do not respond with the word 'INVENTORY'."""
       }
     ],
     temperature=1,
@@ -215,7 +215,7 @@ if "worldSetting" not in st.session_state:
   chatAI(worldSetting)
   goal = gpt("",f"""
   This is a book series. Write the final goal for the end of the series. 
-  You must use infinitive form. 
+  Your response should start with a verb.
   The goal must be {random.choice(["good", "evil"])}.
   Do not respond with any prose, only respond with one sentence describing the goal.
   Skip the "Your goal is" part. 
