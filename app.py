@@ -1,60 +1,48 @@
-import openai
+from anthropic import Anthropic
 import time, random
 import streamlit as st
 
-# Example dummy function hard coded to return the same weather
-# In production, this could be your backend API or an external API
-
 delay = 0.5
+model = "claude-3-sonnet-20240229"
 
 def gpt(system, user):
   time.sleep(delay)
-  response = openai.ChatCompletion.create(
-      model="gpt-3.5-turbo",
+  response = client.messages.create(
+      model=model,
       messages=[
           {
             "role": "user",
-            "content": user
-          },
-          {
-              "role": "system",
-              "content": system
+            "content": system + "\n" + user
           }
       ],
       temperature=1,
       max_tokens=200,  # Adjust this limit as needed
-      stop=[],
   )
-  response_text = response.choices[0]["message"]["content"]
+  response_text = response.content[0].text
   return response_text
 
 
 def gptNext(content):
   time.sleep(delay)
-  response = openai.ChatCompletion.create(
-    model="gpt-3.5-turbo",
+  response = client.messages.create(
+    model=model,
     messages=[
       {
         "role": "user", 
-        "content": content
-      },
-      {
-        "role": "system", 
         "content": """
         This is a story, you are the narrator, but never break the fourth wall, no matter what always respond with a continuation of the story.
-        You create unusual and interesting stories, using uncommon names and weird situations.
         You are not descriptive, You do not describe the world, you tell the player what they see.
         Your responses are specific and descriptive, not vague and general.
         Your writing is clear and concise, not flowery and verbose.
         You always write in second person point of view and present tense.
-        Unless otherwise specified, you always use a maximum of 50 words."""
-      }
+        Unless otherwise specified, you always use a maximum of 50 words. """ + "\n" + 
+        content
+      },
     ],
     temperature=1,
-    max_tokens=200,  # Adjust this limit as needed
-    stop=[],       
+    max_tokens=200,  # Adjust this limit as needed   
   )
-  response_text = response.choices[0]["message"]["content"]
+  response_text = response.content[0].text
   return response_text
 
 def gptConsider():
@@ -62,27 +50,23 @@ def gptConsider():
   choice = "I consider what options I have. "
   pastAction.append(choice)
   time.sleep(delay)
-  response = openai.ChatCompletion.create(
-    model="gpt-3.5-turbo",
+  response = client.messages.create(
+    model=model,
     messages=[
       {
         "role": "user", 
-        "content": "Give a list (50 words max) of possible actions the character can take. Start your response with \"You could...\" \n"+"SETTING: " + worldSetting + "\n" + "\n".join(
-            [pastStory[x]+"\n"+"ACTION: "+pastAction[x] for x in range(max(-5, -len(pastStory)), 0)])
-      },
-      {
-        "role": "system", 
         "content": """
         This is a story, you are the narrator, but never break the fourth wall, no matter what always respond with the story.
         You always write in second person point of view and present tense.
-        You always respond with a maximum of 50 words."""
-      }
+        You always respond with a maximum of 50 words. """ + "\n" + 
+        "Give a list (50 words max) of possible actions the character can take. Start your response with \"You could...\" \n"+"SETTING: " + worldSetting + "\n" + "\n".join(
+            [pastStory[x]+"\n"+"ACTION: "+pastAction[x] for x in range(max(-5, -len(pastStory)), 0)])
+      },
     ],
     temperature=1,
-    max_tokens=100,  # Adjust this limit as needed
-    stop=[],       
+    max_tokens=100,  # Adjust this limit as needed    
   )
-  response = response.choices[0]["message"]["content"]
+  response = response.content[0].text
   pastStory.append(response)
 
 
@@ -90,26 +74,22 @@ def isActionValid():
   time.sleep(delay)
   global inventory
   # check if the action is valid
-  response = openai.ChatCompletion.create(
-    model="gpt-3.5-turbo",
+  response = client.messages.create(
+    model=model,
     messages=[
       {
         "role": "user",
-        "content": "SETTING: " + worldSetting + "\n" + "STORY: " + "\n".join([pastStory[x] + "\n" + pastAction[x] for x in range(max(-5, -len(pastStory)), -1)]) + "\n" + pastStory[-1] + "\n" + "ACTION: " + pastAction[-1] + "\n" + "INVENTORY: " + inventory
-      },
-      {
-        "role": "system",
-        "content":"""
+        "content": """
         Given the story, an action and an inventory, determine if the action is physically possible given the story. 
         It doesn't matter if the action is a bad idea, if it is possible in this world, it is valid.
-        You always respond with either 1 or 0. """
-      }
+        You always respond with either 1 or 0. """ + "\n" + 
+        "SETTING: " + worldSetting + "\n" + "STORY: " + "\n".join([pastStory[x] + "\n" + pastAction[x] for x in range(max(-5, -len(pastStory)), -1)]) + "\n" + pastStory[-1] + "\n" + "ACTION: " + pastAction[-1] + "\n" + "INVENTORY: " + inventory
+      },
     ],
     temperature=1,
-    max_tokens=1,  # Adjust this limit as needed
-    stop=['\n'],
+    max_tokens=2,  # Adjust this limit as needed
   )
-  response_text = response.choices[0]["message"]["content"]
+  response_text = response.content[0].text
   if response_text == "1":
     return True
   return False
@@ -118,77 +98,74 @@ def getInventory():
   time.sleep(delay)
   global inventory
   # check if the last item affects the inventory
-  response = openai.ChatCompletion.create(
-    model="gpt-3.5-turbo",
+  response = client.messages.create(
+    model=model,
     messages=[
       {
         "role": "user",
-        "content": """Given the past, and the character's current possessions, respond with their new possessions.
+        "content": """
+        Given the story, and the player's old inventory, check if anything should be changed and respond with their new inventory. This should be like a video game inventory. 
+        You always respond with a list of items. In the format [item1, item2, item3].
+        Do not respond with the word "INVENTORY".
+        Each item in the list should be a single word. 
         """ + "\n" + "STORY: " + "\n".join(
             ["ACTION: "+pastAction[x] + "\n"+ pastStory[x] for x in range(max(-5, -len(pastStory)), 0)]) + "\n" + "INVENTORY: " + inventory
       },
-      {
-        "role": "system",
-        "content":"""
-        You always respond with a list of items. 
-        You do not respond with the word 'INVENTORY'."""
-      }
     ],
     temperature=1,
     max_tokens=50, 
-    stop=['\n'],
   )
-  response_text = response.choices[0]["message"]["content"]
+  response_text = response.content[0].text
   return response_text
 
 def getHealth():
   time.sleep(delay)
   global health
   # check if health is changed
-  response = openai.ChatCompletion.create(
-    model="gpt-3.5-turbo",
+  response = client.messages.create(
+    model=model,
     messages=[
       {
         "role": "user",
-        "content": "HEALTH: " + str(health) + " \n" + "ACTION: " + pastAction[-1] + "\n" + "RESULT: " + pastStory[-1]
-      },
-      {
-        "role": "system",
-        "content":"""
+        "content": """
         Given the player's current health, their action and the result, you should respond with their new health.
         The maximum health is 10. 
         You always respond with a single number indicating their health. Yo do not respond with any prose. 
-        You do not respond with the word 'HEALTH'. You only respond with a single number."""
+        You do not respond with the word 'HEALTH'. You only respond with a single number.""" + "\n" + 
+        "HEALTH: " + str(health) + " \n" + "ACTION: " + pastAction[-1] + "\n" + "RESULT: " + pastStory[-1]
       }
     ],
     temperature=1,
-    max_tokens=1, 
-    stop=[],
+    max_tokens=2, 
   )
-  response_text = response.choices[0]["message"]["content"]
+  response_text = response.content[0].text
   if response_text.isdigit():
     return response_text
   print("fail: "+response_text)
   return health 
-
+APIKey = ""
 try:
-  openai.api_key = st.session_state.openaiKey
+  APIKey = st.session_state.APIKey
 except:
-  openai.api_key = ""
+  APIKey = ""
 try:
   settingPrompt = st.session_state.settingPrompt
 except:
   settingPrompt = ""
 
-openai.api_key = st.text_input(
-    "OpenAI API Key", type="password", disabled=openai.api_key != "")
-if openai.api_key == "":
-  st.error("Please enter your OpenAI API Key")
+APIKey = st.text_input(
+    "Anthropic API Key", type="password", disabled=APIKey != "")
+if APIKey == "":
+  st.error("Please enter your Anthropic API Key")
   st.stop()
 
-if "openaiKey" not in st.session_state:
-  st.session_state.openaiKey = openai.api_key
+if "APIKey" not in st.session_state:
+  st.session_state.APIKey = APIKey
   st.rerun()
+
+client = Anthropic(
+    api_key=APIKey,
+)
 
 settingPrompt = st.text_input(
     "World Prompt", disabled=settingPrompt != "")
@@ -272,5 +249,5 @@ if choice:
     st.session_state.pastAction = pastAction
     chatAI("Nuh uh")
 healthBar = st.progress(int(health)*10, text="Health: "+str(health))
-st.text("Inventory: "+inventory)
+st.text("Inventory: " + inventory)
 st.button("Help", on_click=gptConsider)
